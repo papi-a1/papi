@@ -1,1 +1,469 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Papi AI — Asisten Cerdas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp }  from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAxc9dvVNk6-vLJ_Ny-8Ic-HR_VVEf5_Z0",
+    authDomain:        "papi-ai.firebaseapp.com",
+    databaseURL:       "https://papi-ai-default-rtdb.firebaseio.com",
+    projectId:         "papi-ai",
+    storageBucket:     "papi-ai.firebasestorage.app",
+    messagingSenderId: "400991286072",
+    appId:             "1:400991286072:web:d994eb7adb39f25fe407cd",
+    measurementId:     "G-XM7QHQZL99"
+  };
+
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const provider = new GoogleAuthProvider();
+
+  window._auth     = auth;
+  window._provider = provider;
+
+  window.doGoogleLogin = async () => {
+    try {
+      setBtnState(true);
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      setBtnState(false);
+      if (e.code !== "auth/popup-closed-by-user")
+        showErr("Login gagal: " + (e.message || e.code));
+    }
+  };
+
+  window.doLogout = () => signOut(auth);
+
+  onAuthStateChanged(auth, user => {
+    if (user) renderApp(user);
+    else      renderLogin();
+  });
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0b10;--bg2:#111118;--surface:#1e1e28;--surf2:#252532;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --gold:#f0c060;--gold2:#d4a820;--golddim:rgba(240,192,96,0.13);
+  --text:#eeebe6;--text2:#9a97a5;--text3:#65636f;
+  --purple:#7b6cf6;--purpledim:rgba(123,108,246,0.15);
+  --r:14px;--rsm:8px;--rlg:20px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;overflow:hidden}
+
+/* ── LOADING ── */
+#screen-loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:9999}
+.ld-logo{width:56px;height:56px;border-radius:16px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:24px;color:#1a0f00;animation:breathe 1.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(.9);opacity:.7}}
+.ld-text{font-size:13px;color:var(--text3)}
+
+/* ── LOGIN ── */
+#screen-login{
+  position:fixed;inset:0;background:var(--bg);
+  background-image:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(240,192,96,0.09),transparent);
+  display:none;align-items:center;justify-content:center;z-index:998;
+}
+.login-card{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:24px;
+  padding:44px 38px;width:min(400px,92vw);text-align:center;
+  box-shadow:0 24px 64px rgba(0,0,0,0.5);
+}
+.lc-logo{width:68px;height:68px;border-radius:20px;background:var(--gold);display:inline-flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:30px;color:#1a0f00;margin-bottom:22px;box-shadow:0 8px 28px rgba(240,192,96,0.25)}
+.lc-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.5px;margin-bottom:8px}
+.lc-title span{color:var(--gold)}
+.lc-sub{font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:30px}
+.g-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:11px;
+  background:#fff;border:none;border-radius:12px;padding:14px 20px;
+  font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:#1f1f1f;
+  cursor:pointer;transition:background .15s,transform .12s,box-shadow .15s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.25);
+}
+.g-btn:hover{background:#f5f5f5;transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,0,0,0.35)}
+.g-btn:active{transform:translateY(0)}
+.g-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.g-icon{width:21px;height:21px;flex-shrink:0}
+.g-spinner{width:19px;height:19px;border:2px solid rgba(0,0,0,0.12);border-top-color:#4285f4;border-radius:50%;animation:spin .65s linear infinite;display:none;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+#login-err{font-size:12px;color:#ff6b6b;margin-top:12px;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.25);border-radius:8px;padding:9px 12px;display:none;text-align:left}
+.lc-footer{font-size:12px;color:var(--text3);margin-top:20px;line-height:1.6}
+
+/* ── APP ── */
+#screen-app{display:none;height:100vh;overflow:hidden}
+.app{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
+
+/* sidebar */
+.sb{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-head{padding:22px 18px 18px;border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:36px;height:36px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:17px;color:#1a0f00;flex-shrink:0}
+.logo-name{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:var(--text);letter-spacing:-.3px}
+.logo-name span{color:var(--gold)}
+.new-btn{margin-top:13px;width:100%;display:flex;align-items:center;gap:8px;background:var(--golddim);border:1px solid rgba(240,192,96,0.22);color:var(--gold);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:8px 14px;border-radius:var(--rsm);cursor:pointer;transition:background .15s}
+.new-btn:hover{background:rgba(240,192,96,0.22);border-color:rgba(240,192,96,0.4)}
+.sb-lbl{padding:14px 18px 6px;font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.sb-hist{flex:1;overflow-y:auto;padding:0 10px;scrollbar-width:thin;scrollbar-color:var(--surf2) transparent}
+.h-item{padding:8px 10px;border-radius:var(--rsm);font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .13s,color .13s}
+.h-item:hover,.h-item.active{background:var(--surface);color:var(--text)}
+.sb-foot{padding:12px;border-top:1px solid var(--border);position:relative}
+.u-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--rsm);cursor:pointer;transition:background .13s}
+.u-row:hover{background:var(--surface)}
+.u-av{width:34px;height:34px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;border:1.5px solid var(--border2)}
+.u-av img{width:100%;height:100%;object-fit:cover}
+.u-av.init{background:var(--purpledim);color:var(--purple)}
+.u-info{flex:1;min-width:0}
+.u-name{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-email{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.out-btn{width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .13s,color .13s}
+.out-btn:hover{background:rgba(255,80,80,0.12);color:#ff6b6b}
+.out-btn svg{width:15px;height:15px}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 26px;border-bottom:1px solid var(--border);background:rgba(11,11,16,0.65);backdrop-filter:blur(12px);flex-shrink:0}
+.model-pill{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border2);padding:5px 13px 5px 9px;border-radius:99px;font-size:12px;font-weight:500;color:var(--text2)}
+.mdot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e}
+.tb-r{display:flex;align-items:center;gap:8px}
+.tb-av{width:30px;height:30px;border-radius:50%;overflow:hidden;border:1.5px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:border-color .15s}
+.tb-av:hover{border-color:var(--gold)}
+.tb-av img{width:100%;height:100%;object-fit:cover}
+.tb-av.init{background:var(--purpledim);color:var(--purple)}
+
+/* main */
+.main{display:flex;flex-direction:column;overflow:hidden}
+.chat{flex:1;overflow-y:auto;padding:28px 0;scrollbar-width:thin;scrollbar-color:var(--surf2) transparent}
+.mw{max-width:760px;margin:0 auto;padding:0 26px}
+
+/* welcome */
+.welcome{max-width:600px;margin:36px auto 0;padding:0 26px;text-align:center}
+.w-icon{width:62px;height:62px;border-radius:17px;background:var(--gold);display:inline-flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:#1a0f00;margin-bottom:18px}
+.w-title{font-family:'Syne',sans-serif;font-size:30px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:-.4px}
+.w-title span{color:var(--gold)}
+.w-sub{color:var(--text2);font-size:14.5px;line-height:1.65;margin-bottom:28px}
+.suggs{display:grid;grid-template-columns:1fr 1fr;gap:9px;text-align:left}
+.sugg{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px;cursor:pointer;transition:background .17s,border-color .17s,transform .17s}
+.sugg:hover{background:var(--surf2);border-color:rgba(240,192,96,0.28);transform:translateY(-1px)}
+.sugg .st{font-size:11px;color:var(--gold);font-weight:500;margin-bottom:4px}
+.sugg .sx{font-size:12.5px;color:var(--text2);line-height:1.45}
+
+/* messages */
+.msg{display:flex;gap:12px;margin-bottom:22px;animation:up .22s ease}
+@keyframes up{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse}
+.av{width:30px;height:30px;border-radius:50%;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden}
+.av.ai{background:var(--gold);color:#1a0f00;font-family:'Syne',sans-serif}
+.av.user{background:var(--purpledim);border:1px solid rgba(123,108,246,0.3);color:var(--purple)}
+.bub{max-width:calc(100% - 90px);padding:11px 15px;font-size:14px;line-height:1.65;border-radius:var(--r)}
+.msg.ai .bub{background:var(--surface);border:1px solid var(--border);color:var(--text);border-top-left-radius:4px}
+.msg.user .bub{background:var(--golddim);border:1px solid rgba(240,192,96,0.2);color:var(--text);border-top-right-radius:4px}
+.bub p{margin-bottom:8px}.bub p:last-child{margin-bottom:0}
+.bub strong{color:var(--gold);font-weight:600}
+.bub code{background:rgba(0,0,0,0.35);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:12.5px;color:#9ee0b0}
+.bub pre{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;margin:8px 0;overflow-x:auto;font-size:12.5px}
+.bub pre code{background:none;border:none;padding:0;color:#c8d8b8}
+.bub ul,.bub ol{padding-left:17px;margin:6px 0}
+.bub li{margin-bottom:3px}
+.typing{display:flex;gap:12px;margin-bottom:22px}
+.tdots{background:var(--surface);border:1px solid var(--border);border-radius:4px var(--r) var(--r) var(--r);padding:13px 16px;display:flex;gap:5px;align-items:center}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text3);animation:tp 1.3s infinite}
+.dot:nth-child(2){animation-delay:.18s}.dot:nth-child(3){animation-delay:.36s}
+@keyframes tp{0%,60%,100%{transform:scale(.75);opacity:.4}30%{transform:scale(1.1);opacity:1}}
+
+/* input */
+.input-area{padding:14px 26px 22px;flex-shrink:0}
+.inbox{max-width:760px;margin:0 auto;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rlg);padding:13px 12px 11px 17px;transition:border-color .2s,box-shadow .2s}
+.inbox:focus-within{border-color:rgba(240,192,96,0.38);box-shadow:0 0 0 3px rgba(240,192,96,0.06)}
+.irow{display:flex;align-items:flex-end;gap:9px}
+#msg{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;resize:none;min-height:22px;max-height:180px;overflow-y:auto;scrollbar-width:thin}
+#msg::placeholder{color:var(--text3)}
+#send{width:35px;height:35px;border-radius:10px;background:var(--gold);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .1s}
+#send:hover{background:var(--gold2)}
+#send:active{transform:scale(.96)}
+#send:disabled{background:var(--surf2);cursor:not-allowed}
+.ifooter{display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
+.hint{font-size:11.5px;color:var(--text3)}
+.disc{text-align:center;font-size:11.5px;color:var(--text3);margin-top:8px;max-width:760px;margin-left:auto;margin-right:auto}
+
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--surf2);border-radius:99px}
+@media(max-width:640px){
+  .app{grid-template-columns:1fr}.sb{display:none}
+  .topbar,.input-area{padding-left:14px;padding-right:14px}
+  .mw,.welcome{padding-left:14px;padding-right:14px}
+  .suggs{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="screen-loading">
+  <div class="ld-logo">P</div>
+  <div class="ld-text">Memuat Papi AI…</div>
+</div>
+
+<!-- LOGIN -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="lc-logo">P</div>
+    <div class="lc-title">Masuk ke <span>Papi AI</span></div>
+    <p class="lc-sub">Login sekali, langsung bisa chat.<br>Tidak perlu setup apapun.</p>
+    <button class="g-btn" id="g-btn" onclick="doGoogleLogin()">
+      <svg class="g-icon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      <div class="g-spinner" id="g-spin"></div>
+      <span id="g-txt">Masuk dengan Google</span>
+    </button>
+    <div id="login-err"></div>
+    <p class="lc-footer">Dengan masuk, Anda menyetujui syarat penggunaan Papi AI.</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="screen-app">
+  <div class="app">
+    <aside class="sb">
+      <div class="sb-head">
+        <div class="logo">
+          <div class="logo-mark">P</div>
+          <div class="logo-name">Papi <span>AI</span></div>
+        </div>
+        <button class="new-btn" onclick="newChat()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Chat Baru
+        </button>
+      </div>
+      <div class="sb-lbl">Riwayat</div>
+      <div class="sb-hist" id="hist"></div>
+      <div class="sb-foot">
+        <div class="u-row" onclick="doLogout()" title="Klik untuk keluar">
+          <div class="u-av init" id="sb-av">?</div>
+          <div class="u-info">
+            <div class="u-name" id="sb-name">…</div>
+            <div class="u-email" id="sb-email">…</div>
+          </div>
+          <button class="out-btn" title="Keluar">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="model-pill">
+          <span class="mdot"></span>
+          Papi AI · Online
+        </div>
+        <div class="tb-r">
+          <div class="tb-av init" id="tb-av" onclick="doLogout()" title="Keluar">?</div>
+        </div>
+      </div>
+
+      <div class="chat" id="chat">
+        <div id="w-screen" class="welcome">
+          <div class="w-icon">P</div>
+          <h1 class="w-title">Halo! Saya <span>Papi AI</span></h1>
+          <p class="w-sub" id="w-sub">Asisten kecerdasan buatan Anda. Tanyakan apa saja!</p>
+          <div class="suggs">
+            <div class="sugg" onclick="useSugg('Jelaskan cara kerja kecerdasan buatan dengan bahasa yang mudah dipahami')">
+              <div class="st">Pelajari AI</div><div class="sx">Jelaskan cara kerja kecerdasan buatan</div>
+            </div>
+            <div class="sugg" onclick="useSugg('Buatkan rencana belajar Python dari nol selama 30 hari')">
+              <div class="st">Coding</div><div class="sx">Rencana belajar Python 30 hari</div>
+            </div>
+            <div class="sugg" onclick="useSugg('Berikan 5 ide bisnis online yang cocok dijalankan di Indonesia')">
+              <div class="st">Bisnis</div><div class="sx">Ide bisnis online di Indonesia</div>
+            </div>
+            <div class="sugg" onclick="useSugg('Tulis puisi tentang keindahan alam Indonesia')">
+              <div class="st">Kreatif</div><div class="sx">Puisi tentang alam Indonesia</div>
+            </div>
+          </div>
+        </div>
+        <div class="mw" id="msgs"></div>
+      </div>
+
+      <div class="input-area">
+        <div class="inbox">
+          <div class="irow">
+            <textarea id="msg" rows="1" placeholder="Tulis pesan untuk Papi AI…" oninput="resize(this)" onkeydown="onKey(event)"></textarea>
+            <button id="send" disabled onclick="kirim()">
+              <svg fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+            </button>
+          </div>
+          <div class="ifooter">
+            <span class="hint">Enter kirim · Shift+Enter baris baru</span>
+          </div>
+        </div>
+        <p class="disc">Papi AI dapat membuat kesalahan. Harap verifikasi informasi penting.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ── SCREEN HELPERS ──
+const S = id => document.getElementById(id);
+let _user = null;
+
+function renderLogin() {
+  _user = null;
+  S('screen-loading').style.display = 'none';
+  S('screen-login').style.display   = 'flex';
+  S('screen-app').style.display     = 'none';
+  setBtnState(false);
+}
+
+function renderApp(user) {
+  _user = user;
+  const name  = user.displayName || 'Pengguna';
+  const email = user.email || '';
+  const photo = user.photoURL || '';
+  const init  = name.charAt(0).toUpperCase();
+
+  // Sidebar
+  S('sb-name').textContent  = name;
+  S('sb-email').textContent = email;
+  const sbAv = S('sb-av');
+  if (photo) { sbAv.innerHTML = `<img src="${photo}" alt="">`; sbAv.classList.remove('init'); }
+  else       { sbAv.textContent = init; sbAv.classList.add('init'); }
+
+  // Topbar
+  const tbAv = S('tb-av');
+  if (photo) { tbAv.innerHTML = `<img src="${photo}" alt="" style="width:100%;height:100%;object-fit:cover">`; tbAv.classList.remove('init'); }
+  else       { tbAv.textContent = init; tbAv.classList.add('init'); }
+
+  // Welcome
+  S('w-sub').textContent = `Halo, ${name.split(' ')[0]}! Apa yang bisa Papi AI bantu hari ini?`;
+  window._uPhoto = photo;
+  window._uInit  = init;
+
+  S('screen-loading').style.display = 'none';
+  S('screen-login').style.display   = 'none';
+  S('screen-app').style.display     = 'block';
+  setTimeout(() => S('msg').focus(), 100);
+}
+
+function setBtnState(loading) {
+  const btn = S('g-btn'); if (!btn) return;
+  btn.disabled = loading;
+  S('g-spin').style.display = loading ? 'block' : 'none';
+  S('g-txt').textContent    = loading ? 'Sedang masuk…' : 'Masuk dengan Google';
+}
+
+function showErr(msg) {
+  const el = S('login-err');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+// ── CHAT ──
+const msgEl   = S('msg');
+const sendBtn = S('send');
+const msgsEl  = S('msgs');
+const chatEl  = S('chat');
+const histEl  = S('hist');
+const wScreen = S('w-screen');
+let history = [], busy = false;
+
+msgEl.addEventListener('input', () => { sendBtn.disabled = !msgEl.value.trim() || busy; });
+function resize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,180)+'px'; }
+function onKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sendBtn.disabled)kirim();} }
+function useSugg(t) { msgEl.value=t; sendBtn.disabled=false; kirim(); }
+
+function fmt(t) {
+  t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  t = t.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+  t = t.replace(/```[\w]*\n?([\s\S]+?)```/g,'<pre><code>$1</code></pre>');
+  t = t.replace(/^[\*\-] (.+)$/gm,'<li>$1</li>');
+  t = t.replace(/(<li>[\s\S]+?<\/li>)/g,'<ul>$1</ul>');
+  return t.split(/\n\n+/).map(p=>p.trim()?`<p>${p.replace(/\n/g,'<br>')}</p>`:'').join('')||`<p>${t}</p>`;
+}
+
+function addMsg(role, text) {
+  wScreen.style.display = 'none';
+  const w = document.createElement('div'); w.className = 'msg ' + role;
+  const a = document.createElement('div'); a.className = 'av ' + role;
+  if (role === 'ai') {
+    a.textContent = 'P';
+  } else if (window._uPhoto) {
+    a.innerHTML = `<img src="${window._uPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    a.textContent = window._uInit || 'K';
+  }
+  const b = document.createElement('div'); b.className = 'bub'; b.innerHTML = fmt(text);
+  w.appendChild(a); w.appendChild(b);
+  msgsEl.appendChild(w);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function showTyping() {
+  const w = document.createElement('div'); w.className='typing'; w.id='typing';
+  const a = document.createElement('div'); a.className='av ai'; a.textContent='P';
+  const d = document.createElement('div'); d.className='tdots';
+  d.innerHTML="<span class='dot'></span><span class='dot'></span><span class='dot'></span>";
+  w.appendChild(a); w.appendChild(d); msgsEl.appendChild(w);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+function rmTyping() { S('typing')?.remove(); }
+
+function addHist(txt) {
+  const lbl = txt.length>38 ? txt.slice(0,38)+'…' : txt;
+  const el = document.createElement('div'); el.className='h-item active'; el.textContent=lbl;
+  histEl.querySelectorAll('.h-item').forEach(i=>i.classList.remove('active'));
+  histEl.prepend(el);
+}
+
+async function kirim() {
+  const text = msgEl.value.trim(); if(!text||busy) return;
+  busy = true; msgEl.value=''; msgEl.style.height='auto'; sendBtn.disabled=true;
+  if (history.length===0) addHist(text);
+  addMsg('user', text);
+  history.push({ role:'user', content:text });
+  showTyping();
+  try {
+    // Kirim ke /api/chat — Vercel serverless function yang menyimpan API key
+    const res  = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: history,
+        userName: _user?.displayName || ''
+      })
+    });
+    const data = await res.json();
+    rmTyping();
+    if (data.content?.[0]?.text) {
+      const reply = data.content[0].text;
+      history.push({ role:'assistant', content:reply });
+      addMsg('ai', reply);
+    } else {
+      addMsg('ai', '⚠️ Error: ' + (typeof data.error === 'string' ? data.error : data.error?.message || 'Respons tidak valid.'));
+    }
+  } catch(e) {
+    rmTyping();
+    addMsg('ai','⚠️ Gagal terhubung ke server. Coba lagi.');
+  }
+  busy=false; sendBtn.disabled=!msgEl.value.trim();
+}
+
+function newChat() {
+  history=[]; msgsEl.innerHTML=''; wScreen.style.display='block';
+  histEl.querySelectorAll('.h-item').forEach(i=>i.classList.remove('active'));
+}
+</script>
+</body>
+</html>
